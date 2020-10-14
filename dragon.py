@@ -3,6 +3,7 @@
 
 import argparse
 import datetime
+from dateutil.relativedelta import *
 import errno
 import inspect
 import string
@@ -11,6 +12,7 @@ from bs4 import BeautifulSoup
 import os
 from subprocess import call
 import sys
+import time
 import requests
 import requests_cache
 
@@ -28,10 +30,13 @@ def get_script_dir(follow_symlinks=True):
 
 def get_url(url):
     headers =   {
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+                    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36 (compatible; YandexScreenshotBot/3.0; +http://yandex.com/bots)'
                 }
 
     response = requests.get(url, headers=headers)
+    if not response.from_cache:
+        time.sleep(5.0)
+
     content = response.content
     return content
 
@@ -78,10 +83,14 @@ def main(args):
             print(child.text)
     
     if game is not None:
-        d = datetime.date(2018, 1, 1)
-        num_viewers = get_game_viewers(game, d)
-        print('Game {} got {} viewers for {}'.format(game, num_viewers, d))
+        sdate = datetime.date(2015, 8, 1)
+        edate = datetime.date.today()
 
+        d = sdate
+        while (d < edate):
+            num_viewers = get_game_viewers(game, d)
+            print('Game {} got {} viewers for {}'.format(game, num_viewers, d))
+            d = d + relativedelta(months = 1)    
 
 if __name__ == '__main__':
     logging.basicConfig(level=os.getenv('LOGLEVEL', 'INFO'), stream=sys.stdout, format='%(module)s %(message)s')
