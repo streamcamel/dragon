@@ -108,22 +108,44 @@ def scrape_game(game):
         game_entry = {}
         game_entry['date'] = d.strftime("%Y-%m")
         game_entry['average_viewers'] = num_viewers
+        if num_viewers == -1:
+            game_entry['error'] = 'HTML Parse Error'
+
         game_output.append(game_entry)
         d = d + relativedelta(months = 1)
 
+        # Early exit to investigate the issue
+        if num_viewers == -1:
+            break
+
     with open(game_output_dir + '/' + game + '.json', 'w') as outfile:
         json.dump(game_output, outfile, indent=4, sort_keys=True)
-    
+
+def normalize_name(game_name):
+    normalized_name = game_name
+    for char in ":'\"?!%$^&*/\\":
+        normalized_name = normalized_name.replace(char, '')
+
+    # Multiple spaces back to 1, and replaced by _
+    normalized_name = ' '.join(normalized_name.split())
+    normalized_name = normalized_name.replace(' ', '_')
+
+    normalized_name = unidecode.unidecode(normalized_name)
+
+    return normalized_name
+
 def main(args):
     parser = argparse.ArgumentParser(description='GnomeSully Scrapping')
     parser.add_argument("--url", type=str, help="Full game URL to parse")
     parser.add_argument("--game", type=str, help="Game to parse (e.g. Fortnite)")
     parser.add_argument("--streamcamel_games", default=False, action='store_true')
+    parser.add_argument("--company", type=str, help="Company's games to parse (e.g. electronic-arts)")
 
     args = parser.parse_args()
     url = args.url
     game = args.game
     streamcamel_games = args.streamcamel_games
+    company = args.company
 
     make_dir('cache')
     requests_cache.install_cache('cache/cache')
@@ -141,20 +163,26 @@ def main(args):
     
     if streamcamel_games:
         st = StreamCamel()
-        games = st.top_games(10)
+        games = st.games_stats()
 
+        count = 0
         for game in games:
+            count += 1
             game_name = game['name']
-            normalized_name = game_name
-            for char in ":'\"?!%$^&*":
-                normalized_name = normalized_name.replace(char, '')
+            normalized_name = normalize_name(game_name)
+            print('[{}/{}] Game={}, normalized={}'.format(count, len(games), game_name, normalized_name))
+            scrape_game(normalized_name)
 
-            # Multiple spaces back to 1, and replaced by _
-            normalized_name = ' '.join(normalized_name.split())
-            normalized_name = normalized_name.replace(' ', '_')
+    if company:
+        st = StreamCamel()
+        games = st.games_stats(company=company)
 
-            normalized_name = unidecode.unidecode(normalized_name)
-            print('Game={}, normalized={}'.format(game['name'], normalized_name))
+        count = 0
+        for game in games:
+            count += 1
+            game_name = game['name']
+            normalized_name = normalize_name(game_name)
+            print('[{}/{}] Game={}, normalized={}'.format(count, len(games), game_name, normalized_name))
             scrape_game(normalized_name)
 
 if __name__ == '__main__':
