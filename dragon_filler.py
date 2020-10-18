@@ -68,6 +68,8 @@ def main(args):
 
     input_path = 'output/games'
 
+    game_records = []
+
     for filename in os.listdir(input_path):
         logger.info('Reading input file: ' + filename)
         full_path = os.path.join(input_path, filename)
@@ -90,9 +92,7 @@ def main(args):
                 logger.warning("json file {} is missing 'game_id".format(full_path))
                 continue 
 
-            game_id = meta_data['game_id']
-
-            game_records = []
+            game_id = meta_data['game_id']       
 
             for d in data:
                 if 'error' in d:
@@ -111,20 +111,16 @@ def main(args):
                 date = datetime.strptime(d['date'], "%Y-%m")
                 game_records.append((game_id, date, average_viewers))
 
-            cnx = mysql.connector.connect(user=database_user, password=database_password,
+    cnx = mysql.connector.connect(user=database_user, password=database_password,
                                             host=database_host,
                                             database=database_name, use_pure=True)
+    cursor = cnx.cursor()
 
-            cursor = cnx.cursor()
-
-            add_games_sql = sql_make_insert_into('dragon_games_monthly', ['game_id', 'time', 'viewer_count'])
-            logger.info('Inserting or Updating ' + str(len(game_records)) + ' records...')
-            utc_pre_db_time = datetime.utcnow()
-            cursor.executemany(add_games_sql, game_records)
-            cnx.commit()
-            cnx.close()
-            utc_postdb_time = datetime.utcnow()
-            logger.info('Done in ' + str(utc_postdb_time - utc_pre_db_time) + ' seconds. Cleaning up connection')
+    add_games_sql = sql_make_insert_into('dragon_games_monthly', ['game_id', 'time', 'viewer_count'])
+    logger.info('Inserting or Updating ' + str(len(game_records)) + ' records...')
+    cursor.executemany(add_games_sql, game_records)
+    cnx.commit()
+    cnx.close()
 
 if __name__ == '__main__':
     logging.basicConfig(level=os.getenv('LOGLEVEL', 'INFO'), stream=sys.stdout, format='%(module)s %(message)s')
