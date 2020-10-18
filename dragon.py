@@ -88,7 +88,10 @@ def get_game_viewers(game, date):
     else:
         return -1
 
-def scrape_game(game):
+def scrape_game(game_name, game_id=None):
+    normalized_name = normalize_name(game_name)
+    print('Game={}, normalized={}'.format(game_name, normalized_name))
+
     game_output_dir = 'output/games'
     make_dir(game_output_dir)
 
@@ -98,12 +101,20 @@ def scrape_game(game):
     # SullyGnome returns 0 for the current month
     edate = edate + relativedelta(months = -1)
 
-    game_output = []
+    game_output = {}
+    game_output['data'] = []
+    game_output['meta-data'] = {
+        'streamcamel_name' : game_name,
+        'sullygnome_name' : normalized_name,
+    }
+
+    if not game_id is None:
+        game_output['meta-data']['game_id'] = game_id
 
     d = sdate
     while (d < edate):
-        num_viewers = get_game_viewers(game, d)
-        print('Game {} got {} viewers for {}'.format(game, num_viewers, d))
+        num_viewers = get_game_viewers(normalized_name, d)
+        print('Game {} got {} viewers for {}'.format(normalized_name, num_viewers, d))
 
         game_entry = {}
         game_entry['date'] = d.strftime("%Y-%m")
@@ -111,20 +122,23 @@ def scrape_game(game):
         if num_viewers == -1:
             game_entry['error'] = 'HTML Parse Error'
 
-        game_output.append(game_entry)
+        game_output['data'].append(game_entry)
         d = d + relativedelta(months = 1)
 
         # Early exit to investigate the issue
         if num_viewers == -1:
             break
 
-    with open(game_output_dir + '/' + game + '.json', 'w') as outfile:
+    with open(game_output_dir + '/' + normalized_name + '.json', 'w') as outfile:
         json.dump(game_output, outfile, indent=4, sort_keys=True)
 
 def normalize_name(game_name):
     normalized_name = game_name
-    for char in ":'\"?!%$^&*/\\":
+    for char in ":'\"?!%$^*/\\":
         normalized_name = normalized_name.replace(char, '')
+
+    normalized_name = normalized_name.replace('+', 'plus')
+    normalized_name = normalized_name.replace('&', 'and')
 
     # Multiple spaces back to 1, and replaced by _
     normalized_name = ' '.join(normalized_name.split())
@@ -169,9 +183,10 @@ def main(args):
         for game in games:
             count += 1
             game_name = game['name']
-            normalized_name = normalize_name(game_name)
-            print('[{}/{}] Game={}, normalized={}'.format(count, len(games), game_name, normalized_name))
-            scrape_game(normalized_name)
+            game_id = None
+            if 'game_id' in game:
+                game_id = game['game_id']
+            scrape_game(game_name, game_id=game_id)
 
     if company:
         st = StreamCamel()
@@ -181,9 +196,10 @@ def main(args):
         for game in games:
             count += 1
             game_name = game['name']
-            normalized_name = normalize_name(game_name)
-            print('[{}/{}] Game={}, normalized={}'.format(count, len(games), game_name, normalized_name))
-            scrape_game(normalized_name)
+            game_id = None
+            if 'game_id' in game:
+                game_id = game['game_id']
+            scrape_game(game_name, game_id=game_id)
 
 if __name__ == '__main__':
     logging.basicConfig(level=os.getenv('LOGLEVEL', 'INFO'), stream=sys.stdout, format='%(module)s %(message)s')
