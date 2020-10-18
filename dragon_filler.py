@@ -34,6 +34,30 @@ def validate_env(var):
 
     return value
 
+def sql_make_insert_into(table, keys):
+    if len(keys) == 0:
+        return ""
+
+    query = "INSERT INTO " + table + " (" + ', '.join(keys) + ") "
+    query += "VALUES ("
+
+    first_key = True
+    for key in keys:
+        if not first_key:
+            query += ', '
+        query += '%s'
+        first_key = False
+    query += ") ON DUPLICATE KEY UPDATE "
+
+    first_key = True
+    for key in keys:
+        if not first_key:
+            query += ', '
+        query += "{}=VALUES({})".format(key, key)
+        first_key = False
+
+    return query
+
 def main(args):
     parser = argparse.ArgumentParser(description='Dragon Filler Service')
     
@@ -42,112 +66,65 @@ def main(args):
     database_user = validate_env('SCRATCH_DB_USER')
     database_password = validate_env('SCRATCH_DB_PASSWORD') 
 
-    # for filename in os.listdir(input_path):
-    #     # Make sure file has no _pending
-    #     if filename.find('_pending') != -1:
-    #         continue
+    input_path = 'output/games'
 
-    #     if not filename.endswith('.zip'):
-    #         continue
+    for filename in os.listdir(input_path):
+        logger.info('Reading input file: ' + filename)
+        full_path = os.path.join(input_path, filename)
 
-    #     logger.info('Reading input file: ' + filename)
-    #     container = utils.loadContainer(os.path.join(input_path, filename))
+        with open(full_path) as json_file:
+            container = json.load(json_file)
 
-    #     if not ('data' in container and 'meta-data' in container):
-    #         logger.warning('Invalid JSON in ' + filename)
-    #         continue
+            if not 'data' in container:
+                logger.warning("json file {} is missing 'data'".format(full_path))
+                continue
 
-    #     data = container['data']
-    #     if 'meta-data' in container:
-    #         start_time = container['meta-data']['start-time']
+            if not 'meta-data' in container:
+                logger.warning("json file {} is missing 'meta-data'".format(full_path))
+                continue
 
-    #     if start_time is None:
-    #         logger.warning('No start-time in ' + filename)
-    #         continue
+            data = container['data']
+            meta_data = container['meta-data']
 
-    #     logger.info('Timestamp: ' + start_time)
+            if not 'game_id' in meta_data:
+                logger.warning("json file {} is missing 'game_id".format(full_path))
+                continue 
 
-    #     stream_records = []
-    #     stream_info = []
-    #     try:
-    #         for stream in data:
-    #             if ('id' in stream and 'game_id' in stream and 'viewer_count' in stream):
-    #                 stream_records.append(
-    #                     (
-    #                     start_time,
-    #                     stream['id'], 
-    #                     stream['game_id'],
-    #                     stream['viewer_count']
-    #                     ))
+            game_id = meta_data['game_id']
 
-    #                 stream_info.append(
-    #                     (
-    #                     stream['id'], 
-    #                     stream['user_id'], 
-    #                     stream['game_id'],
-    #                     stream['type'],
-    #                     stream['language'],
-    #                     0 # Twitch Source is 0
-    #                     ))
-                    
-    #         try:
-    #             if not database_name is None:
-    #                 cnx = mysql.connector.connect(user=database_user, password=database_password,
-    #                                         host=database_host,
-    #                                         database=database_name, use_pure=True)
-    #                 cursor = cnx.cursor()
+            game_records = []
 
-    #                 add_stream_sql = utils.sql_make_insert_into(settings.streams_table_name, ['time', 'id', 'game_id', 'viewer_count'])
-    #                 add_stream_info_sql = utils.sql_make_insert_into(settings.streams_info_table_name, ['id', 'user_id', 'game_id', 'type', 'language', 'source'])
+            for d in data:
+                if 'error' in d:
+                    logger.warning("json file {} has error={}".format(full_path, d['error']))
+                    continue
 
-    #                 logger.info('Inserting or Updating ' + str(len(stream_records)) + ' records...')
-    #                 utc_pre_db_time = datetime.utcnow()
-    #                 cursor.executemany(add_stream_sql, stream_records)
-    #                 cursor.executemany(add_stream_info_sql, stream_info)
-    #                 utc_postdb_time = datetime.utcnow()
-    #                 logger.info('Done in ' + str(utc_postdb_time - utc_pre_db_time) + ' seconds. Cleaning up connection')
-    #             else:
-    #                 logger.info('Null DB Would insert ' + str(len(stream_records)) + ' records.')
-    #         except mysql.cursor.Error as err:
-    #             logger.critical("Can't insert stream data: {}".format(err))
-            
-    #         if not database_name is None:
-    #             cnx.commit()
-    #             cursor.close()
-    #             cnx.close()
+                if not 'average_viewers' in d:
+                    logger.warning("json file {} is missing 'average_viewers'".format(full_path))
+                    continue
 
-    #             logger.info('Updating rollup')
+                if not 'date' in d:
+                    logger.warning("json file {} is missing 'date'".format(full_path))
+                    continue
 
-    #             # 2020-06-09 13:55 format (in UTC)
+                average_viewers = d['average_viewers']
+                date = datetime.strptime(d['date'], "%Y-%m")
+                game_records.append((game_id, date, average_viewers))
 
-    #             now_utc = datetime.strptime(start_time + ' -0000', '%Y-%m-%d %H:%M %z')
+            cnx = mysql.connector.connect(user=database_user, password=database_password,
+                                            host=database_host,
+                                            database=database_name, use_pure=True)
 
-    #             # TODO: Change begin_utc to at least week ago
-    #             # since we want to catch up any company changes that may have been missed
+            cursor = cnx.cursor()
 
-
-    #             # Need to floor to the 10 minutes
-    #             # If 13 minutes --> 10 minutes
-    #             # If 10 minutes --> 10 minutes
-    #             # If 27 minutes --> 20 minutes
-
-    #             # Figure out how many minutes we have
-    #             # Then round down
-    #             minutes = (now_utc.minute // 10) * 10
-
-    #             begin_utc = now_utc.replace(microsecond=0, minute=minutes, second=0)
-    #             end_utc = begin_utc + timedelta(minutes=10)
-
-    #             logger.info('begin_utc {} to end_utc {}'.format(begin_utc.strftime("%Y-%m-%d %H:%M"), end_utc.strftime("%Y-%m-%d %H:%M")))
-
-    #             script_rollup_path = os.path.join(get_script_dir(), 'rollup.py')
-    #             call([sys.executable, script_rollup_path, '--date_begin=' + begin_utc.strftime("%Y-%m-%d %H:%M"), '--date_end=' + end_utc.strftime("%Y-%m-%d %H:%M")])
-
-    #             os.remove(os.path.join(input_path, filename))
-    #             logger.info('Deleted input file: ' + os.path.join(input_path, filename))
-
-    #     except mysql.connector.Error as err:
-    #         logger.critical("Cannot connect to database {}".format(err))
+            add_games_sql = sql_make_insert_into('dragon_games_monthly', ['game_id', 'time', 'viewer_count'])
+            logger.info('Inserting or Updating ' + str(len(game_records)) + ' records...')
+            utc_pre_db_time = datetime.utcnow()
+            cursor.executemany(add_games_sql, game_records)
+            cnx.commit()
+            cnx.close()
+            utc_postdb_time = datetime.utcnow()
+            logger.info('Done in ' + str(utc_postdb_time - utc_pre_db_time) + ' seconds. Cleaning up connection')
 
 if __name__ == '__main__':
     logging.basicConfig(level=os.getenv('LOGLEVEL', 'INFO'), stream=sys.stdout, format='%(module)s %(message)s')
