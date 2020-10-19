@@ -1,0 +1,18 @@
+[
+    {
+        "name" : "Madden NFL 20",
+        "normalized" : "Madden_20"
+    },
+    {
+        "name" : "Plants vs Zombies: Garden Warfare 2",
+        "normalized" : "Plants_vs._Zombies_Garden_Warfare_2"
+    },
+    {
+        "name" : "Mass Effect: Andromeda",
+        "normalized" : "Untitled_Mass_Effect_Game"
+    },
+    {
+        "name" : "Anthem",
+        "normalized" : "Untitled_BioWare_Edmonton_Game"
+    }    
+]
