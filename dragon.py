@@ -24,6 +24,18 @@ from streamcamel import StreamCamel
 
 logger = logging.getLogger(__name__)
 
+mapping = {}
+
+def read_mapping():
+    with open('config/mapping.json', 'r') as infile:
+        container = json.load(infile)
+        for entry in container:
+            if 'name' in entry and 'normalized' in entry:
+                mapping[entry['name']] = entry['normalized']
+            else:
+                logger.fatal('Mal-formed mapping.json file')
+                exit(2)
+
 def get_script_dir(follow_symlinks=True):
     if getattr(sys, 'frozen', False): # py2exe, PyInstaller, cx_Freeze
         path = os.path.abspath(sys.executable)
@@ -84,6 +96,7 @@ def get_game_information(game, date):
     soup = BeautifulSoup(content, features="lxml")
     dom = etree.HTML(str(soup))
 
+
     if dom is None:
         logging.warning("Game {} for date {} cannot be parsed".format(game, date))
         return (None, None, None)
@@ -95,12 +108,29 @@ def get_game_information(game, date):
     return (average_viewers, average_channels, peak_viewers)
 
 
-def scrape_game(game_name, game_id=None):
+def scrape_game(game_name, game_id=None, skip_existing=False):
     normalized_name = normalize_name(game_name)
-    print('Game={}, normalized={}'.format(game_name, normalized_name))
+    #print('Game={}, normalized={}'.format(game_name, normalized_name))
 
     game_output_dir = 'output/games'
     make_dir(game_output_dir)
+
+    if skip_existing:
+        file_path = game_output_dir + '/' + normalized_name + '.json'
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as infile:
+                container = json.load(infile)
+                if 'data' in container:
+
+                    found_error = False
+                    for d in container['data']:
+                        if 'error' in d:
+                            found_error = True
+                            break
+
+                    if not found_error:
+                        return
+                
 
     sdate = datetime.date(2015, 8, 1)
     edate = datetime.date.today()
@@ -122,7 +152,7 @@ def scrape_game(game_name, game_id=None):
     while (d < edate):
         (num_viewers, num_streams, peak_viewers) = get_game_information(normalized_name, d)
         print('Game {}, viewers={}, streams={}, peak_viewers={}, for {}'.format(
-            normalized_name, num_viewers, num_streams, peak_viewers, d))
+            game_name, num_viewers, num_streams, peak_viewers, d))
 
         game_entry = {}
         game_entry['date'] = d.strftime("%Y-%m")
@@ -137,13 +167,16 @@ def scrape_game(game_name, game_id=None):
         d = d + relativedelta(months = 1)
 
         # Early exit to investigate the issue
-        if num_viewers == -1:
+        if num_viewers is None or num_streams is None or peak_viewers is None:
             break
 
     with open(game_output_dir + '/' + normalized_name + '.json', 'w') as outfile:
         json.dump(game_output, outfile, indent=4, sort_keys=True)
 
 def normalize_name(game_name):
+    if game_name in mapping:
+        return mapping[game_name]
+
     normalized_name = game_name
     for char in ":'\"?!%$^*/\\":
         normalized_name = normalized_name.replace(char, '')
@@ -160,17 +193,21 @@ def normalize_name(game_name):
     return normalized_name
 
 def main(args):
+    read_mapping()
+
     parser = argparse.ArgumentParser(description='GnomeSully Scrapping')
     parser.add_argument("--url", type=str, help="Full game URL to parse")
     parser.add_argument("--game", type=str, help="Game to parse (e.g. Fortnite)")
     parser.add_argument("--streamcamel_games", default=False, action='store_true')
     parser.add_argument("--company", type=str, help="Company's games to parse (e.g. electronic-arts)")
+    parser.add_argument("--skip_existing", default=False, action='store_true')
 
     args = parser.parse_args()
     url = args.url
     game = args.game
     streamcamel_games = args.streamcamel_games
     company = args.company
+    skip_existing = args.skip_existing
 
     make_dir('cache')
     requests_cache.install_cache('cache/cache')
@@ -210,7 +247,7 @@ def main(args):
             game_id = None
             if 'game_id' in game:
                 game_id = game['game_id']
-            scrape_game(game_name, game_id=game_id)
+            scrape_game(game_name, game_id=game_id, skip_existing=skip_existing)
 
 if __name__ == '__main__':
     logging.basicConfig(level=os.getenv('LOGLEVEL', 'INFO'), stream=sys.stdout, format='%(module)s %(message)s')
