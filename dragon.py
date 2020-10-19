@@ -62,7 +62,19 @@ def get_url(url):
     content = response.content
     return content
 
-def get_game_viewers(game, date):
+def parse_dom_value(dom, xpath):
+    elem = dom.xpath(xpath)
+    if elem is not None:
+        for child in elem:
+            value = child.text.replace(",", "")
+            if is_int(value):
+                return int(value)
+            else:
+                return None
+    else:
+        return None
+
+def get_game_information(game, date):
     base_url = 'https://sullygnome.com/game/' + game + '/'
     date_string = date.strftime("%Y%B").lower()
     url = base_url + date_string
@@ -74,19 +86,14 @@ def get_game_viewers(game, date):
 
     if dom is None:
         logging.warning("Game {} for date {} cannot be parsed".format(game, date))
-        return -1
+        return (None, None, None)
+                                            
+    average_viewers = parse_dom_value(dom, '/html/body/div[2]/div[2]/div[4]/div/div[3]/div/div/div[2]/div')
+    average_channels = parse_dom_value(dom, '/html/body/div[2]/div[2]/div[4]/div/div[4]/div/div/div[2]/div')
+    peak_viewers = parse_dom_value(dom, '/html/body/div[2]/div[2]/div[4]/div/div[6]/div/div/div[2]/div')
 
-    elem = dom.xpath('/html/body/div[2]/div[2]/div[4]/div/div[3]/div/div/div[2]/div')
-    if elem is not None:
-        for child in elem:
-            value = child.text.replace(",", "")
-            if is_int(value):
-                return int(value)
-            else:
-                logging.warning("Game {} for date {} doesn't have a parsable viewers count: {}".format(game, date, child.text))
-                return -1
-    else:
-        return -1
+    return (average_viewers, average_channels, peak_viewers)
+
 
 def scrape_game(game_name, game_id=None):
     normalized_name = normalize_name(game_name)
@@ -113,14 +120,18 @@ def scrape_game(game_name, game_id=None):
 
     d = sdate
     while (d < edate):
-        num_viewers = get_game_viewers(normalized_name, d)
-        print('Game {} got {} viewers for {}'.format(normalized_name, num_viewers, d))
+        (num_viewers, num_streams, peak_viewers) = get_game_information(normalized_name, d)
+        print('Game {}, viewers={}, streams={}, peak_viewers={}, for {}'.format(
+            normalized_name, num_viewers, num_streams, peak_viewers, d))
 
         game_entry = {}
         game_entry['date'] = d.strftime("%Y-%m")
-        game_entry['average_viewers'] = num_viewers
-        if num_viewers == -1:
+        if num_viewers is None or num_streams is None or peak_viewers is None:
             game_entry['error'] = 'HTML Parse Error'
+        else:
+            game_entry['average_viewers'] = num_viewers
+            game_entry['average_channels'] = num_streams
+            game_entry['peak_viewers'] = peak_viewers
 
         game_output['data'].append(game_entry)
         d = d + relativedelta(months = 1)

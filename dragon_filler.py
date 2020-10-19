@@ -108,15 +108,18 @@ def main(args):
                     continue
 
                 average_viewers = d['average_viewers']
+                average_channels = d['average_channels']
+                peak_viewers = d['peak_viewers']
+
                 date = datetime.strptime(d['date'], "%Y-%m")
-                game_records.append((game_id, date, average_viewers))
+                game_records.append((game_id, date, average_viewers, peak_viewers, average_channels))
 
     cnx = mysql.connector.connect(user=database_user, password=database_password,
                                             host=database_host,
                                             database=database_name, use_pure=True)
     cursor = cnx.cursor()
 
-    add_games_sql = sql_make_insert_into('dragon_games_monthly', ['game_id', 'time', 'viewer_count'])
+    add_games_sql = sql_make_insert_into('dragon_games_monthly', ['game_id', 'time', 'viewer_count', 'viewer_count_peak', 'stream_count'])
     logger.info('Inserting or Updating ' + str(len(game_records)) + ' records...')
     cursor.executemany(add_games_sql, game_records)
     cnx.commit()
