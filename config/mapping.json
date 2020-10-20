@@ -14,5 +14,9 @@
     {
         "name" : "Anthem",
         "normalized" : "Untitled_BioWare_Edmonton_Game"
-    }    
+    },
+    {
+        "name" : "Hearthstone",
+        "normalized" : "Hearthstone_Heroes_of_Warcraft"
+    }   
 ]

@@ -96,7 +96,6 @@ def get_game_information(game, date):
     soup = BeautifulSoup(content, features="lxml")
     dom = etree.HTML(str(soup))
 
-
     if dom is None:
         logging.warning("Game {} for date {} cannot be parsed".format(game, date))
         return (None, None, None)
@@ -121,7 +120,6 @@ def scrape_game(game_name, game_id=None, skip_existing=False):
             with open(file_path, 'r') as infile:
                 container = json.load(infile)
                 if 'data' in container:
-
                     found_error = False
                     for d in container['data']:
                         if 'error' in d:
@@ -234,11 +232,13 @@ def main(args):
             game_id = None
             if 'game_id' in game:
                 game_id = game['game_id']
-            scrape_game(game_name, game_id=game_id)
+            scrape_game(game_name, game_id=game_id, skip_existing=skip_existing)
 
     if company:
         st = StreamCamel()
         games = st.games_stats(company=company)
+
+        logger.info("Obtained {} games".format(len(games)))
 
         count = 0
         for game in games:
