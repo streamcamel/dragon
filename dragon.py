@@ -236,7 +236,7 @@ def main(args):
 
     if company:
         st = StreamCamel()
-        games = st.games_stats(company=company)
+        games = st.company_games(company)
 
         logger.info("Obtained {} games".format(len(games)))
 
