@@ -18,5 +18,34 @@
     {
         "name" : "Hearthstone",
         "normalized" : "Hearthstone_Heroes_of_Warcraft"
-    }   
+    },
+    {
+        "name" : "Final_Fantasy_XI",
+        "normalized" : "Final_Fantasy_XI_Online"
+    },
+    {
+        "name" : "FIFA_06",
+        "normalized" : "FIFA_Soccer_06"
+    },
+    {
+        "name" : "Anno 1503",
+        "normalized" : "1503_A.D._The_New_World"
+    },
+    {
+        "name" : "Call of Duty: Black Ops Cold War",
+        "normalized" : "Call_of_Duty_2020_working_title_"
+    },
+    {
+        "name" : "Call of Duty: Modern Warfare 2",
+        "normalized" : "Modern_Warfare_2"
+    },
+    {
+        "name" : "Fantastic Four",
+        "normalized" : "Fantastic_4"
+    }
 ]
+
+
+
+
+
