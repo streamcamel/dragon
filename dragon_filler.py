@@ -121,7 +121,10 @@ def main(args):
 
     add_games_sql = sql_make_insert_into('dragon_games_monthly', ['game_id', 'time', 'viewer_count', 'viewer_count_peak', 'stream_count'])
     logger.info('Inserting or Updating ' + str(len(game_records)) + ' records...')
-    cursor.executemany(add_games_sql, game_records)
+
+    while game_records:
+        small_game_records, game_records = game_records[:10000], game_records[10000:]
+        cursor.executemany(add_games_sql, small_game_records)
     cnx.commit()
     cnx.close()
 

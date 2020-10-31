@@ -207,6 +207,10 @@ def normalize_name(game_name):
         name = name.replace(' ', '_')
 
         name = unidecode.unidecode(name)
+
+        # Some unicode will go back to ?
+        name = name.replace('[?]', '')
+
         final_names.append(name)
 
     return final_names
@@ -244,7 +248,7 @@ def main(args):
     
     if streamcamel_games:
         st = StreamCamel()
-        games = st.games_stats()
+        games = st.games()
 
         count = 0
         for game in games:
